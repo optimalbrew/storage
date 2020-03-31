@@ -1,0 +1,2 @@
+# storage
+state rent
