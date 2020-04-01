@@ -32,26 +32,21 @@ Let `dest` be any node that a TX will *modify* or *create* (reading is always fr
 
 ```
 10. const storageRent = 1/(2^21) //gas per byte-sec
-
-20. const rentCollectTrigger = 10000  //soft uppper bound on past due rent
+20. const rentCollectTrigger = 10000  //"soft" limit on rent accumulation
 30. const minPay = 1000               //avoid small transactions
 
-// past rent due, whenever last updated (can be negative, prepaid)
-40. RentPast = dest.rentOutStanding
 
-//storage accumulated since last update
-50. RentAccumulated = (time.Now() - dest.timeRentLastUpdated) * dest.prev_nodesize * storageRent
-
-// optional TTL = desired time to live, advance payment. Min 6 months for new nodes
-60. RentFuture = TTL * dest.new_nodeSize * storageRent
+40. RentPast = dest.rentOutStanding     // past rent due, whenever last updated (can be negative, prepaid)
+50. RentAccumulated = (time.Now() - dest.timeRentLastUpdated) * dest.prev_nodesize * storageRent    //storage accumulated since last update
+60. RentFuture = TTL * dest.new_nodeSize * storageRent      // optional TTL = desired time to live, advance payment. Min 6 months for new nodes
 
 // add all sources
-70. useRent = RentPast + RentAccum + RentFuture 
+70. useRentGas = RentPast + RentAccum + RentFuture 
 
 // minimum rent to pay now at end of TX
-80. if (useRent - rentCollectTrigger > 0){  // e.g. rent due > 10k gas 
-90.    minRent = max(useRent - rentCollectTrigger, minPay)  
-100. } elseif (useRent > minPay) {                           
+80. if (useRentGas - rentCollectTrigger > 0){  // e.g. rent due > 10k gas 
+90.    minRent = max(useRentGas - rentCollectTrigger, minPay)  
+100. } elseif (useRentGas > minPay) {                           
 110.    minRent = minPay            // pay the mininum amount allowed 
 120. } else {
 130.        minRent = 0                 // pay nothing
@@ -61,10 +56,10 @@ Let `dest` be any node that a TX will *modify* or *create* (reading is always fr
 140. if (rentOfferred >= minRent){
 150.    if (rentOfferred >= minPay){
 160.        consumeRent(rentOffered)
-170.        dest.rentOutStanding = useRent - consumedRent
+170.        dest.rentOutStanding = useRentGas - consumedRent
 180.            dest.timeRentLastUpdated = time.Now()
 190.    } else{     // rent too low to consume (e.g. below 1000 gas)
-200.            dest.rentOutStanding = useRent
+200.            dest.rentOutStanding = useRentGas
 210.            dest.timeRentLastUpdated = time.Now()
         }       
     } else {
@@ -75,6 +70,24 @@ Let `dest` be any node that a TX will *modify* or *create* (reading is always fr
 
 
 ### Concerns with previous proposal and pseudocode
+
+RSKIP113 pseudocode
+```
+10. if (d>lastRentPaidTime) {
+20.    useRentGas =  nodeSize*(d-lastRentPaidTime)/2^21
+30.    if ((dest was modified) && (useRentGas>=1000)) || 
+40.       ((dest was NOT modified) && (useRentGas>=10000)) {
+50.        dest.lastRentPaidTime = now
+60.        consumeRentGas(useRentGas);
+      }
+}
+
+```
+- 
+
+
+
+
 1. RSKIP113 proposes a new field `lastRentPaidTime`. However, this -- by itself -- cannot completely account for accumulated storage rent.
 - this only tracks payments, but does not track changes in nodesize (storage amount) between rent payments.
 - example: a new node of size 10 bytes is created and is charged 6 months rent in advance. The `lastRentPaidTime` is set 6 months away. This means changes in the nodes size are not taken into account for rent caluclations for that time period.  
