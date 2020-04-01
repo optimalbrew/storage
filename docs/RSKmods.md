@@ -69,7 +69,7 @@ Let `dest` be any node that a currently executing transaction `TX_current` will 
 
 // minimum rent to pay now at end of TX
 80. if (useRentGas - rentCollectTrigger > 0){   // rent exceeds Trigger (e.g. 10k) 
-90.    minRentNow = max(useRentGas - rentCollectTrigger, minPay)  
+90.    minRentNow = max(useRentGas - rentCollectTrigger, dontPayIfBelow)  
 100. } elseif (useRentGas > dontPayIfBelow) {                           
 110.    minRentNow = dontPayIfBelow             // min allowed (e.g. 1k) 
 120. } else {
@@ -80,11 +80,11 @@ Let `dest` be any node that a currently executing transaction `TX_current` will 
 140. if (rentOfferred >= minRentNow){   // rentOfferred from TX_curent
 150.    if (rentOfferred >= dontPayIfBelow){
 160.        consumeRent(rentOffered)
-170.        dest.rentOutStanding = useRentGas - consumedRent
-180.            dest.timeRentLastUpdated = time.Now()
+170.        dest.rentOutStanding = useRentGas - consumedRent  //update trie
+180.        dest.timeRentLastUpdated = time.Now()             // update trie
 190.    } else{     // rent too low to consume (e.g. below 1k gas)
-200.            dest.rentOutStanding = useRentGas       // update trie
-210.            dest.timeRentLastUpdated = time.Now()   // update trie
+200.        dest.rentOutStanding = useRentGas       // update trie
+210.        dest.timeRentLastUpdated = time.Now()   // update trie
         }       
     } else {
 220.        revertTransaction() // revert changes/updates for ALL nodes in TX_current
