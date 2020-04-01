@@ -62,15 +62,14 @@ Let `dest` be any node that a TX will *modify* or *create* (reading is always fr
 150.    if (rentOfferred >= minPay){
 160.        consumeRent(rentOffered)
 170.        dest.rentOutStanding = useRent - consumedRent
-            dest.timeRentLastUpdated = time.Now()
-180.    } else{     // rent too low to consume (e.g. below 1000 gas)
-            dest.rentOutStanding = useRent
-            dest.timeRentLastUpdated = time.Now()
+180.            dest.timeRentLastUpdated = time.Now()
+190.    } else{     // rent too low to consume (e.g. below 1000 gas)
+200.            dest.rentOutStanding = useRent
+210.            dest.timeRentLastUpdated = time.Now()
         }       
     } else {
-        revertTransaction() // revert for all nodes referenced in the transaction
+220.        revertTransaction() // revert for all nodes referenced in the transaction
     }
-
 
 ```
 
