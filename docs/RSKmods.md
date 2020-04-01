@@ -1,101 +1,106 @@
-## Modifications to RSKIP113
-
-**Motivation:** At present users only pay for the *amount of data* stored in blockchain state but *not the time* for which state values are stored. Storage rent will provide users with price signals to use state storage more efficiently.
-
-### Summary
-**Who pays:** storage rent is paid per node by their respective owners.
-
-**How much:** $1/2^{21}$ gas units per byte per second.
-
-**Who is it paid to:** It is collected by miners. Storage rent is an *additional, uncapped* source of revene for miners. Unlike transaction fees, there is no block gas limit for storage.  
+## Modifications to rent proposal
 
 
-### A. Introduce two new fields into Trie nodes
-1. `timeRentLastUpdated`: Most recent time when storage rent was last computed for this node. 
-- This can be used to measure time elasped between successive rent computations.
-- This is independent of whether any rent payment was collected at that time. 
-2. `rentOutStanding`: How much rent was outstanding at the last update (after accounting for any payments made at that time). 
-- including any past amount 
-- this can be negative, which indicates that some rent is pre-paid (paid in advance). In fact, it can even be encouraged (combined with an appropriate scheme to handle refunds).
-- this can have a *upper bound* like 10,000 gas units (as in RSKIP113) 
-- This is a *soft* upper bound because the outstanding rent can accumulate and exceed this value between node updates. 
-- However, any time this node is touched by a transaction, it cannot be updated without a payment which leaves the outstanding rent under the threshold.
-- This can help users estimate a time to live (TTL) every time they make a change to storage.
+### Concerns with pseudocode in RSKIP113
 
-*Account hibernation:* A different threshold can be adopted (later) for account hibernation. The threshold can be used in combination with a lower bound on time duration since last update. 
-
-
-### Proposed pseudocode
-
-Let `dest` be any node that a TX will *modify* or *create* (reading is always free). This includes nodes that the TX sender does not own.
-
-
-```
-10. const storageRent = 1/(2^21) //gas per byte-sec
-20. const rentCollectTrigger = 10000  //"soft" limit on rent accumulation
-30. const minPay = 1000               //avoid small transactions
-
-
-40. RentPast = dest.rentOutStanding     // past rent due, whenever last updated (can be negative, prepaid)
-50. RentAccumulated = (time.Now() - dest.timeRentLastUpdated) * dest.prev_nodesize * storageRent    //storage accumulated since last update
-60. RentFuture = TTL * dest.new_nodeSize * storageRent      // optional TTL = desired time to live, advance payment. Min 6 months for new nodes
-
-// add all sources
-70. useRentGas = RentPast + RentAccum + RentFuture 
-
-// minimum rent to pay now at end of TX
-80. if (useRentGas - rentCollectTrigger > 0){  // e.g. rent due > 10k gas 
-90.    minRent = max(useRentGas - rentCollectTrigger, minPay)  
-100. } elseif (useRentGas > minPay) {                           
-110.    minRent = minPay            // pay the mininum amount allowed 
-120. } else {
-130.        minRent = 0                 // pay nothing
-    }
-
-// deduct rent from sender provided it (rent offered) exceeds minimum
-140. if (rentOfferred >= minRent){
-150.    if (rentOfferred >= minPay){
-160.        consumeRent(rentOffered)
-170.        dest.rentOutStanding = useRentGas - consumedRent
-180.            dest.timeRentLastUpdated = time.Now()
-190.    } else{     // rent too low to consume (e.g. below 1000 gas)
-200.            dest.rentOutStanding = useRentGas
-210.            dest.timeRentLastUpdated = time.Now()
-        }       
-    } else {
-220.        revertTransaction() // revert for all nodes referenced in the transaction
-    }
-
-```
-
-
-### Concerns with previous proposal and pseudocode
-
-RSKIP113 pseudocode
 ```
 10. if (d>lastRentPaidTime) {
 20.    useRentGas =  nodeSize*(d-lastRentPaidTime)/2^21
-30.    if ((dest was modified) && (useRentGas>=1000)) || 
-40.       ((dest was NOT modified) && (useRentGas>=10000)) {
-50.        dest.lastRentPaidTime = now
-60.        consumeRentGas(useRentGas);
+30A    if ((dest was modified) && (useRentGas>=1000)) || 
+30B.       ((dest was NOT modified) && (useRentGas>=10000)) {
+40.        dest.lastRentPaidTime = now
+50.        consumeRentGas(useRentGas);
       }
 }
+```
+This pseudocode in RSKIP 113 was meant to be illustrative, not exhaustive. Thus, it does not include some details present in the text of the proposal, e.g. advanced rent of 6 months to be collected from new nodes or deducting some gas even if a transaction is reverted. 
+
+However, there are other concerns:
+1. The computation of `useRentGas` (line 20) does not take into account that some rent may have been paid in advance or that some rent may be outstanding from before.
+
+2. Not every change in a node results in a rent payment. A rent payment is triggerred only if condition in lines 30A,B is met. The rent computation **does not track changes** in `nodesize` in between two rent payments.  
+
+3. Advance payments allow user to predict a minimum time to live (TTL) for the account. But the current logic  `consumeRentGas(useRentGas)` (line 50) does not permit advanced payments for existing nodes.
+
+4. If a new node is created, then we enter the `else` block for `if` (line 10), which is not specified. 
+- Suppose new node is charged 6 months rent in advance. The `lastRentPaidTime` is set 6 months away. This means changes in the `nodesize` may not be taken into account for rent calculations for 6 months.
+
+*My takeaway:* By itself, `lastRentPaidTime` seems inadequate for rent calculations and payments. It may be adequate if nodesize was constant or if advance payments are not allowed.
+
+
+### Suggestion 
+Introduce two new fields into Trie nodes (instead of `lastRentPaidTime`)
+1. `timeRentLastUpdated`: Most recent time when storage rent was last **computed** (not paid) for this node. 
+- This can be used to measure time elasped between successive rent computations.
+- This is independent of whether any rent payment was collected at that time. 
+2. `rentOutStanding`: How much rent was outstanding at the last update (after accounting for any payments made at that time).  
+- this can be negative, which indicates that some rent is pre-paid (paid in advance). In fact, it can even be encouraged (combined with an appropriate scheme to handle refunds).
+- this can have a *upper bound* like 10,000 gas units (as in RSKIP113) 
+- This is a *soft* upper bound because the outstanding rent can accumulate and exceed this value between node updates. 
+- However, any time this node is modified by a transaction, it cannot be updated without a payment which leaves the outstanding rent under the threshold.
+- This can help users control the time to live (TTL) each time they make a change to storage.
+
+*Account hibernation:* Some combinations of these fields can be used (later) to set triggers for account hibernation. 
+
+
+### Proposed pseudocode
+This proposal is also meant to be illustrative, not exhaustive.
+
+
+Let `dest` be any node that a currently executing transaction `TX_current` will *modify* or *create*. 
 
 ```
-- 
+10. const storageRent = 1/(2^21) //gas per byte-sec
+20. const rentCollectTrigger = 10000  // A "soft" limit on outstanding rent
+30. const dontPayIfBelow = 1000       // min. payment to avoid small transactions
+
+/* 3 possible components of rent
+    1. past rent due, whenever last updated i.e. calculated (can be negative, if prepaid)
+    2. storage rent accumulated since last update (use previous nodesize)
+    3. Future rent paid in advance. TTL (time to live), min 6 months for new nodes
+    Future rent depends on NEW nodesize 
+*/
+40. RentPast = dest.rentOutStanding
+50. RentAccumulated = (time.Now() - dest.timeRentLastUpdated) * dest.previous_nodesize * storageRent
+60. RentFuture = TTL * dest.updated_nodesize * storageRent     //TTL, nodesize from TX_current or 6 months (new node)
+
+// add all sources
+70. useRentGas = RentPast + RentAccumulated + RentFuture 
+
+// minimum rent to pay now at end of TX
+80. if (useRentGas - rentCollectTrigger > 0){   // rent exceeds Trigger (e.g. 10k) 
+90.    minRentNow = max(useRentGas - rentCollectTrigger, minPay)  
+100. } elseif (useRentGas > dontPayIfBelow) {                           
+110.    minRentNow = dontPayIfBelow             // min allowed (e.g. 1k) 
+120. } else {
+130.    minRentNow = 0                          // pay nothing at present
+    }
+
+// deduct rent from sender provided rent offered via TX exceeds minimum
+140. if (rentOfferred >= minRentNow){   // rentOfferred from TX_curent
+150.    if (rentOfferred >= dontPayIfBelow){
+160.        consumeRent(rentOffered)
+170.        dest.rentOutStanding = useRentGas - consumedRent
+180.            dest.timeRentLastUpdated = time.Now()
+190.    } else{     // rent too low to consume (e.g. below 1k gas)
+200.            dest.rentOutStanding = useRentGas       // update trie
+210.            dest.timeRentLastUpdated = time.Now()   // update trie
+        }       
+    } else {
+220.        revertTransaction() // revert changes/updates for ALL nodes in TX_current
+    }
+
+```
+
+### Notes
+
+20. This soft limit can never be exceeded as a result of some transaction. Only passive rent accumulation (no change in node for long periods) can push the outstanding rent beyond this value.
+
+
+220. This includes nodes that the transaction sender does not own and **may not** be responsible to pay rent. However, we do not want to allow sender to impose arbitrary rent on other accounts. So we adopt a conservative approach. The outstanding rent for accounts cannot be pushed beyond the soft limit. than the soft limit  **Issue:** How to handle impact on others? Should be left to contract designer, app developer? 
 
 
 
-
-1. RSKIP113 proposes a new field `lastRentPaidTime`. However, this -- by itself -- cannot completely account for accumulated storage rent.
-- this only tracks payments, but does not track changes in nodesize (storage amount) between rent payments.
-- example: a new node of size 10 bytes is created and is charged 6 months rent in advance. The `lastRentPaidTime` is set 6 months away. This means changes in the nodes size are not taken into account for rent caluclations for that time period.  
-
-
-
-2. Rent to be collected even if node (`dest`) was not modifed. This is to be done only if rent exceeds 10k. 
-- If the node is not modified, users can find some other way to use the information without paying rent (reading is always free).
 
 ### Other concerns
 1. A token transfer changes storage (values, if not size) of atleast two accounts. If these transfers do not affect nodesize, no problem. Suppose, that a TX changes the receipient's storage size, how will that impact the rent to be collected for the recipient?
