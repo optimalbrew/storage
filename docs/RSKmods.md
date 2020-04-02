@@ -102,6 +102,7 @@ Let `dest` be any node that a currently executing transaction `TX_current` will 
 
 
 
-## Refunds
-The refunds associated with `SSTORE` operations for deleting storage will need to account for any oustanding storage rent (including any rent paid in advance).
+## Other Issues
+- The refunds associated with `SSTORE` operations for deleting storage will need to account for any outstanding storage rent (including any rent paid in advance).
+- Rent is paid to miners. Storage costs are perhaps an insignificant component of overall expenses of running a mining operation. That is not the case for independent (non mining) full nodes. It may be beneficial for the ecosystem to develop ways to subsidize the costs of running indepdent full nodes.
 
