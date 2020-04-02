@@ -94,18 +94,13 @@ Let `dest` be any node that a currently executing transaction `TX_current` will 
 
 ### Notes
 
-20. This soft limit can never be exceeded as a result of some transaction. Only passive rent accumulation (no change in node for long periods) can push the outstanding rent beyond this value.
+20: This soft limit can never be exceeded as a result of some transaction. Only passive rent accumulation (no change in node for long periods) can push the outstanding rent beyond this value.
 
 
-220. This includes nodes that the transaction sender does not own and **may not** be responsible to pay rent. However, we do not want to allow sender to impose arbitrary rent on other accounts. So we adopt a conservative approach. The outstanding rent for accounts cannot be pushed beyond the soft limit. than the soft limit  **Issue:** How to handle impact on others? Should be left to contract designer, app developer? 
+220: This includes nodes that the transaction sender does not own and **may not** be responsible to pay rent. However, we do not want to allow sender to impose arbitrary rent on other accounts. So we adopt a conservative approach. The outstanding rent for accounts cannot be pushed beyond the soft limit. **Issue:** How to handle impact on others? Should be left to contract designer, app developer.
 
 
 
-
-### Other concerns
-1. A token transfer changes storage (values, if not size) of atleast two accounts. If these transfers do not affect nodesize, no problem. Suppose, that a TX changes the receipient's storage size, how will that impact the rent to be collected for the recipient?
-2. With the additional field `rentOutStanding`, we can force a computation/update. The owner of the account will then be charged in the future. Even the current sender need not be charged. What is key is that we must update  `rentOutStanding` and `timeRentLastUpdated`.
-3. New accounts: is 6 months too much? What about users who use HD wallets to generate a sequence of single use accounts? Some rent must be charged, else users can split storage across accounts and or time to reduce payments. 
 
 ## Refunds
 The refunds associated with `SSTORE` operations for deleting storage will need to account for any oustanding storage rent (including any rent paid in advance).
