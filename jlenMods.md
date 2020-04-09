@@ -1,7 +1,7 @@
 ## JL's storage branch
 JL created a `storage_rent` branch in May 2018. [changes here](https://github.com/optimalbrew/rskj/compare/master...optimalbrew:storage_rent#) 
 
-This may be prior to the unitrie, i.e. separate trie for account and storaeg (as in eth).
+This is likely prior to the final unitrie implementation.
 
 ### Block executor
 rskj-core/src/main/java/co/rsk/core/bc/BlockExecutor.java
