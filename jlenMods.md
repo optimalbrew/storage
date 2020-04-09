@@ -79,5 +79,5 @@ rskj-core/src/main/java/org/ethereum/vm/program/ProgramResult.java
 rskj-core/src/main/java/org/ethereum/util/TimeUtils.java
 - create a constant for 6 months in seconds (advanced rent payment).
 
-### Bunch of Tests
-A whole lot of tests to go with all the mods.
+### Tests
+A bunch of tests to go with all the mods.
