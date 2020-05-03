@@ -40,9 +40,6 @@ Introduce two new fields into Trie nodes (instead of `lastRentPaidTime`)
 - However, any time this node is modified by a transaction, it cannot be updated without a payment which leaves the outstanding rent under the threshold.
 - This can help users control the time to live (TTL) each time they make a change to storage.
 
-*Account hibernation:* Some combinations of these fields can be used (later) to set triggers for account hibernation. 
-
-
 ### Proposed pseudocode
 This proposal is also meant to be illustrative, not exhaustive.
 
@@ -106,3 +103,5 @@ Let `dest` be any node that a currently executing transaction `TX_current` will 
 - The refunds associated with `SSTORE` operations for deleting storage will need to account for any outstanding storage rent (including any rent paid in advance).
 - Rent is paid to miners. Storage costs are perhaps an insignificant component of overall expenses of running a mining operation. That is not the case for independent (non mining) full nodes. It may be beneficial for the ecosystem to develop ways to subsidize the costs of running indepdent full nodes.
 
+*Account hibernation:* Some combinations of these fields can be used (later) to set triggers for account hibernation.
+**Concern:** hibernation is account-based, while rent is node-based. An account may have several nodes, some delinquent, others not.
